@@ -19,6 +19,17 @@ function initLayoutSwitch(){
   });
 }
 
+/* Font size controls */
+function initFs(){
+  const minus=document.getElementById("fs_minus");
+  const plus=document.getElementById("fs_plus");
+  function set(fs){document.documentElement.style.setProperty("--fs",fs);S.set("fs",fs)}
+  let fs=S.get("fs",1);
+  document.documentElement.style.setProperty("--fs",fs);
+  minus.addEventListener("click",()=>{fs=Math.max(.85,fs-.05);set(fs)});
+  plus.addEventListener("click",()=>{fs=Math.min(1.25,fs+.05);set(fs)});
+}
+
 function initLessons(){[1,2,3,4].forEach(w=>{const ns=`lesson_${w}`;const d=S.get(ns,{testimonios:"",lugar:"",hora:""});const t=document.getElementById(`testimonios_${w}`),l=document.getElementById(`lugar_${w}`),h=document.getElementById(`hora_${w}`);if(t)t.value=d.testimonios;if(l)l.value=d.lugar;if(h)h.value=d.hora;const b=document.getElementById(`save_${w}`);if(b){b.addEventListener("click",()=>{S.set(ns,{testimonios:t.value,lugar:l.value,hora:h.value})})}})}
 
 const BIT_ITEMS=[
@@ -39,79 +50,48 @@ const DEFAULT_TASKS=["Llamar a los miembros del grupo","Orar por ellos","Asistir
 function initTasks(){let tasks=S.get("tasks",null);if(!tasks){tasks=DEFAULT_TASKS.map(t=>({title:t,done:false}));S.set("tasks",tasks)}renderTasks(tasks);document.getElementById("add_task_btn").addEventListener("click",()=>{const v=document.getElementById("add_task").value.trim();if(!v)return;tasks.push({title:v,done:false});S.set("tasks",tasks);document.getElementById("add_task").value="";renderTasks(tasks)});document.getElementById("reset_week").addEventListener("click",()=>{tasks.forEach(t=>t.done=false);S.set("tasks",tasks);renderTasks(tasks)})}
 function renderTasks(tasks){const wrap=document.getElementById("tasks_list");wrap.innerHTML="";tasks.forEach((t,i)=>{const row=document.createElement("div");row.className="checkrow";row.innerHTML=`<input type="checkbox" id="t_${i}" ${t.done?"checked":""}/><label for="t_${i}" style="flex:1">${t.title}</label><button class="btn ghost" data-r="${i}" title="Eliminar">✕</button>`;wrap.appendChild(row);row.querySelector("input").addEventListener("change",e=>{t.done=e.target.checked;S.set("tasks",tasks)});row.querySelector("button").addEventListener("click",()=>{tasks.splice(i,1);S.set("tasks",tasks);renderTasks(tasks)})})}
 
-/* Dropbox-friendly audio */
-function transformDropbox(u){
-  try{
-    const url=new URL(u);
-    if(url.hostname.endsWith("dropbox.com")){
-      url.hostname="dl.dropboxusercontent.com";
-      url.search="";
-      return url.toString();
-    }
-  }catch{}
-  return u.replace("www.dropbox.com","dl.dropboxusercontent.com").replace("?dl=0","").replace("?raw=1","");
-}
-
+/* === Reproductor SOLO-LECTURA === */
+const PLAYLIST=[
+  { title: "Playlist devocional", url: "https://dl.dropboxusercontent.com/scl/fi/yzxzmyzt7pef497itbd5b/playlist.mp3" }
+];
 function initAudioPlayer(){
   const audio=document.getElementById("audio");
   const np=document.getElementById("np_title");
   const listWrap=document.getElementById("aud_list");
-  const inTitle=document.getElementById("aud_title");
-  const inUrl=document.getElementById("aud_url");
-  const btnAdd=document.getElementById("aud_add");
   const btnPrev=document.getElementById("btn_prev");
   const btnNext=document.getElementById("btn_next");
   const btnLoop=document.getElementById("btn_loop");
 
-  // Semilla inicial con la playlist del pastor si no hay nada guardado
-  let playlist=S.get("aud_playlist",null);
-  if(!playlist || !Array.isArray(playlist) || playlist.length===0){
-    playlist=[{title:"Playlist devocional",url:"https://dl.dropboxusercontent.com/scl/fi/yzxzmyzt7pef497itbd5b/playlist.mp3"}];
-    S.set("aud_playlist",playlist);
-  }
   let idx=parseInt(localStorage.getItem("vida_aud_idx")||"0",10);
   let loop=S.get("aud_loop",false);
 
   function saveIdx(){localStorage.setItem("vida_aud_idx",String(idx))}
   function saveTime(){try{localStorage.setItem("vida_aud_time",String(audio.currentTime||0))}catch{}}
   function loadTime(){try{return parseFloat(localStorage.getItem("vida_aud_time")||"0")}catch{return 0}}
+  function setLoopUI(){btnLoop.textContent = `🔁 Loop: ${loop?"on":"off"}`}
 
   function renderList(){
-    listWrap.innerHTML = playlist.length ? "" : `<div class="card small">Lista vacía. Añade enlaces de Dropbox arriba.</div>`;
-    playlist.forEach((it,i)=>{
+    listWrap.innerHTML = "";
+    PLAYLIST.forEach((it,i)=>{
       const row=document.createElement("div");
       row.className="checkrow";
-      row.innerHTML=`<div style="flex:1;min-width:200px;cursor:pointer" data-i="${i}">${i===idx?"▶️ ":""}<strong>${it.title||"Sin título"}</strong><div class="small">${it.url}</div></div><button class="btn ghost" data-x="${i}">✕</button>`;
+      row.innerHTML=`<div style="flex:1;min-width:200px;cursor:pointer" data-i="${i}">${i===idx?"▶️ ":""}<strong>${it.title}</strong></div>`;
       listWrap.appendChild(row);
     });
     listWrap.querySelectorAll("[data-i]").forEach(el=>el.addEventListener("click",()=>{idx=parseInt(el.dataset.i,10);saveIdx();playIndex()}));
-    listWrap.querySelectorAll("[data-x]").forEach(el=>el.addEventListener("click",()=>{const i=parseInt(el.dataset.x,10);playlist.splice(i,1);S.set("aud_playlist",playlist);if(idx>=playlist.length)idx=Math.max(0,playlist.length-1);renderList()}));
   }
 
-  function setLoopUI(){btnLoop.textContent = `🔁 Loop: ${loop?"on":"off"}`}
-
   function playIndex(){
-    if(!playlist.length){audio.removeAttribute("src");np.textContent="Sin selección";renderList();return}
-    const it=playlist[idx];
-    const src=transformDropbox(it.url);
+    const it=PLAYLIST[idx]||PLAYLIST[0];
+    if(!it){audio.removeAttribute("src");np.textContent="Sin selección";return}
     np.textContent = it.title || "Audio";
-    audio.src=src;
+    audio.src=it.url;
     audio.play().catch(()=>{});
     renderList();
   }
 
-  btnAdd.addEventListener("click",()=>{
-    const t=inTitle.value.trim()||"Audio";
-    const u=inUrl.value.trim();
-    if(!u) return;
-    playlist.push({title:t,url:u});
-    S.set("aud_playlist",playlist);
-    inTitle.value=""; inUrl.value="";
-    if(playlist.length===1){idx=0;saveIdx();}
-    renderList();
-  });
-  btnPrev.addEventListener("click",()=>{if(!playlist.length)return;idx = (idx-1+playlist.length)%playlist.length;saveIdx();playIndex()});
-  btnNext.addEventListener("click",()=>{if(!playlist.length)return;idx = (idx+1)%playlist.length;saveIdx();playIndex()});
+  btnPrev.addEventListener("click",()=>{idx = (idx-1+PLAYLIST.length)%PLAYLIST.length;saveIdx();playIndex()});
+  btnNext.addEventListener("click",()=>{idx = (idx+1)%PLAYLIST.length;saveIdx();playIndex()});
   btnLoop.addEventListener("click",()=>{loop=!loop;S.set("aud_loop",loop);setLoopUI()});
 
   audio.addEventListener("ended",()=>{
@@ -119,35 +99,12 @@ function initAudioPlayer(){
     btnNext.click();
   });
   audio.addEventListener("timeupdate",()=>{if(!audio.paused) saveTime()});
+
   setLoopUI();
   renderList();
-  if(playlist.length){
-    playIndex();
-    const t=loadTime();
-    if(!isNaN(t) && t>1){audio.currentTime=t}
-  }
-
-  // Importador masivo: "Título | URL"
-  const bulkBox=document.getElementById("bulk_box");
-  const bulkBtn=document.getElementById("bulk_add");
-  if(bulkBox && bulkBtn){
-    bulkBtn.addEventListener("click",()=>{
-      const txt=bulkBox.value.trim();
-      if(!txt) return;
-      const lines=txt.split(/[\r\n]+/);
-      lines.forEach(line=>{
-        const parts=line.split("|");
-        if(parts.length>=2){
-          const title=parts[0].trim();
-          const url=parts.slice(1).join("|").trim();
-          if(url) playlist.push({title, url});
-        }
-      });
-      S.set("aud_playlist",playlist);
-      bulkBox.value="";
-      renderList();
-    });
-  }
+  playIndex();
+  const t=loadTime();
+  if(!isNaN(t) && t>1){audio.currentTime=t}
 }
 
 function initRecursos(){
@@ -165,3 +122,10 @@ function initRecursos(){
 async function fileToDataURL(file){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
 function applyLogos(){const iglesia=S.get("logo_iglesia",null);const elI=document.getElementById("logo-iglesia");if(elI && iglesia){elI.src=iglesia}}
 function initLogos(){applyLogos();const upI=document.getElementById("up_logo_iglesia"),save=document.getElementById("save_logos"),clear=document.getElementById("clear_logos");if(save){save.addEventListener("click",async()=>{try{if(upI?.files?.[0])S.set("logo_iglesia",await fileToDataURL(upI.files[0]));applyLogos();toast("Logo guardado")}catch(e){toast("No se pudo guardar el logo")}})}if(clear){clear.addEventListener("click",()=>{localStorage.removeItem(S.key("logo_iglesia"));toast("Logo eliminado")})}}
+
+/* Recordatorios (placeholder ligero) */
+function initReminders(){
+  const btn=document.getElementById("save_reminders");
+  if(!btn) return;
+  btn.addEventListener("click",()=>toast("Recordatorios guardados (usa notificaciones del sistema)"));
+}
