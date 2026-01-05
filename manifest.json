@@ -1,0 +1,9 @@
+{
+  "name": "VIDA – Etapa de Equipo",
+  "short_name": "VIDA Equipo",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#e9f2f2",
+  "theme_color": "#0f4c5c",
+  "icons": []
+}
