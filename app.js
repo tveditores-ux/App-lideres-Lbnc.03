@@ -63,7 +63,12 @@ function initAudioPlayer(){
   const btnNext=document.getElementById("btn_next");
   const btnLoop=document.getElementById("btn_loop");
 
-  let playlist=S.get("aud_playlist",[]);
+  // Semilla inicial con la playlist del pastor si no hay nada guardado
+  let playlist=S.get("aud_playlist",null);
+  if(!playlist || !Array.isArray(playlist) || playlist.length===0){
+    playlist=[{title:"Playlist devocional",url:"https://dl.dropboxusercontent.com/scl/fi/yzxzmyzt7pef497itbd5b/playlist.mp3"}];
+    S.set("aud_playlist",playlist);
+  }
   let idx=parseInt(localStorage.getItem("vida_aud_idx")||"0",10);
   let loop=S.get("aud_loop",false);
 
@@ -120,6 +125,28 @@ function initAudioPlayer(){
     playIndex();
     const t=loadTime();
     if(!isNaN(t) && t>1){audio.currentTime=t}
+  }
+
+  // Importador masivo: "Título | URL"
+  const bulkBox=document.getElementById("bulk_box");
+  const bulkBtn=document.getElementById("bulk_add");
+  if(bulkBox && bulkBtn){
+    bulkBtn.addEventListener("click",()=>{
+      const txt=bulkBox.value.trim();
+      if(!txt) return;
+      const lines=txt.split(/[\r\n]+/);
+      lines.forEach(line=>{
+        const parts=line.split("|");
+        if(parts.length>=2){
+          const title=parts[0].trim();
+          const url=parts.slice(1).join("|").trim();
+          if(url) playlist.push({title, url});
+        }
+      });
+      S.set("aud_playlist",playlist);
+      bulkBox.value="";
+      renderList();
+    });
   }
 }
 
