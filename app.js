@@ -2,7 +2,7 @@ const S={key:k=>`vida_${k}`,get(k,f){try{return JSON.parse(localStorage.getItem(
 let toastTimer=null;function toast(m){const t=document.querySelector(".toast");if(!t)return;t.textContent=m;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),1500)}
 function show(p){document.querySelectorAll(".view").forEach(v=>v.classList.add("hide"));document.getElementById(p).classList.remove("hide");document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));document.querySelector(`.tab[data-target='${p}']`).classList.add("active");history.replaceState({}, "", `#${p}`)}
 window.addEventListener("load",()=>{const h=location.hash?.replace("#","")||"home";show(h);if("serviceWorker"in navigator){navigator.serviceWorker.register("./sw.js")}
-initLessons();initBitacora();initTasks();initReminders();initFs();initRecursos();initLogos();initLayoutSwitch()});
+initLessons();initBitacora();initTasks();initReminders();initFs();initRecursos();initLogos();initLayoutSwitch();initAudioPlayer()});
 document.addEventListener("click",e=>{const tab=e.target.closest(".tab");if(tab){e.preventDefault();show(tab.dataset.target)}});
 
 /* Layout switcher */
@@ -39,20 +39,91 @@ const DEFAULT_TASKS=["Llamar a los miembros del grupo","Orar por ellos","Asistir
 function initTasks(){let tasks=S.get("tasks",null);if(!tasks){tasks=DEFAULT_TASKS.map(t=>({title:t,done:false}));S.set("tasks",tasks)}renderTasks(tasks);document.getElementById("add_task_btn").addEventListener("click",()=>{const v=document.getElementById("add_task").value.trim();if(!v)return;tasks.push({title:v,done:false});S.set("tasks",tasks);document.getElementById("add_task").value="";renderTasks(tasks)});document.getElementById("reset_week").addEventListener("click",()=>{tasks.forEach(t=>t.done=false);S.set("tasks",tasks);renderTasks(tasks)})}
 function renderTasks(tasks){const wrap=document.getElementById("tasks_list");wrap.innerHTML="";tasks.forEach((t,i)=>{const row=document.createElement("div");row.className="checkrow";row.innerHTML=`<input type="checkbox" id="t_${i}" ${t.done?"checked":""}/><label for="t_${i}" style="flex:1">${t.title}</label><button class="btn ghost" data-r="${i}" title="Eliminar">✕</button>`;wrap.appendChild(row);row.querySelector("input").addEventListener("change",e=>{t.done=e.target.checked;S.set("tasks",tasks)});row.querySelector("button").addEventListener("click",()=>{tasks.splice(i,1);S.set("tasks",tasks);renderTasks(tasks)})})}
 
-function initReminders(){const cfg=S.get("reminders",{grupo:{weekday:"3",time:"19:00"},miercoles:{time:"19:00"},domingo:{time:"10:00"},pre:[60,10]});document.getElementById("r_grupo_day").value=cfg.grupo.weekday;document.getElementById("r_grupo_time").value=cfg.grupo.time;document.getElementById("r_mie_time").value=cfg.miercoles.time;document.getElementById("r_dom_time").value=cfg.domingo.time;document.getElementById("r_pre").value=cfg.pre.join(",");document.getElementById("save_reminders").addEventListener("click",async()=>{cfg.grupo.weekday=document.getElementById("r_grupo_day").value;cfg.grupo.time=document.getElementById("r_grupo_time").value;cfg.miercoles.time=document.getElementById("r_mie_time").value;cfg.domingo.time=document.getElementById("r_dom_time").value;cfg.pre=document.getElementById("r_pre").value.split(",").map(x=>parseInt(x.trim())).filter(x=>!isNaN(x));S.set("reminders",cfg);if("Notification"in window){const p=await Notification.requestPermission();toast(p==="granted"?"Notificaciones activadas":"Notificaciones no autorizadas")}});setInterval(()=>checkReminders(),60000);checkReminders()}
-function checkReminders(){const cfg=S.get("reminders",null);if(!cfg)return;const now=new Date();const events=[...nextWeekly(now,parseInt(cfg.grupo.weekday),cfg.grupo.time,cfg.pre,"Reunión de Grupo"),...nextWeekly(now,3,cfg.miercoles.time,cfg.pre,"Servicio de Miércoles"),...nextWeekly(now,0,cfg.domingo.time,cfg.pre,"Servicio de Domingo")];events.forEach(ev=>{const diffMin=(ev.when-now)/60000;if(diffMin<=0&&diffMin>-1)fireNotification(ev.title,ev.body)})}
-function nextWeekly(now,weekday,timeStr,pres,title){const [hh,mm]=timeStr.split(":").map(Number);let next=new Date(now);next.setHours(hh,mm,0,0);const day=next.getDay();let delta=(weekday-day);if(delta<0||(delta===0&&next<=now))delta+=7;next.setDate(next.getDate()+delta);return pres.map(mins=>({when:new Date(next.getTime()-mins*60000),title,body:`Recordatorio (${mins} min antes)`}))}
-async function fireNotification(title,body){if(!("Notification"in window))return;if(Notification.permission!=="granted")return;if(navigator.serviceWorker?.controller){navigator.serviceWorker.controller.postMessage({type:"notify",title,body})}else{new Notification(title,{body})}}
+/* Dropbox-friendly audio */
+function transformDropbox(u){
+  try{
+    const url=new URL(u);
+    if(url.hostname.endsWith("dropbox.com")){
+      url.hostname="dl.dropboxusercontent.com";
+      url.search="";
+      return url.toString();
+    }
+  }catch{}
+  return u.replace("www.dropbox.com","dl.dropboxusercontent.com").replace("?dl=0","").replace("?raw=1","");
+}
 
-const FS_LEVELS=[1,1.1,1.22,1.35];function setFs(i){i=Math.max(0,Math.min(FS_LEVELS.length-1,i));document.documentElement.style.setProperty("--fs",FS_LEVELS[i]);localStorage.setItem("vida_fs_idx",i)}
-function initFs(){const idx=parseInt(localStorage.getItem("vida_fs_idx")||"0",10);setFs(idx);document.getElementById("fs_minus").addEventListener("click",()=>setFs(idx>0?idx-1:0));document.getElementById("fs_plus").addEventListener("click",()=>setFs(idx<FS_LEVELS.length-1?idx+1:FS_LEVELS.length-1))}
+function initAudioPlayer(){
+  const audio=document.getElementById("audio");
+  const np=document.getElementById("np_title");
+  const listWrap=document.getElementById("aud_list");
+  const inTitle=document.getElementById("aud_title");
+  const inUrl=document.getElementById("aud_url");
+  const btnAdd=document.getElementById("aud_add");
+  const btnPrev=document.getElementById("btn_prev");
+  const btnNext=document.getElementById("btn_next");
+  const btnLoop=document.getElementById("btn_loop");
+
+  let playlist=S.get("aud_playlist",[]);
+  let idx=parseInt(localStorage.getItem("vida_aud_idx")||"0",10);
+  let loop=S.get("aud_loop",false);
+
+  function saveIdx(){localStorage.setItem("vida_aud_idx",String(idx))}
+  function saveTime(){try{localStorage.setItem("vida_aud_time",String(audio.currentTime||0))}catch{}}
+  function loadTime(){try{return parseFloat(localStorage.getItem("vida_aud_time")||"0")}catch{return 0}}
+
+  function renderList(){
+    listWrap.innerHTML = playlist.length ? "" : `<div class="card small">Lista vacía. Añade enlaces de Dropbox arriba.</div>`;
+    playlist.forEach((it,i)=>{
+      const row=document.createElement("div");
+      row.className="checkrow";
+      row.innerHTML=`<div style="flex:1;min-width:200px;cursor:pointer" data-i="${i}">${i===idx?"▶️ ":""}<strong>${it.title||"Sin título"}</strong><div class="small">${it.url}</div></div><button class="btn ghost" data-x="${i}">✕</button>`;
+      listWrap.appendChild(row);
+    });
+    listWrap.querySelectorAll("[data-i]").forEach(el=>el.addEventListener("click",()=>{idx=parseInt(el.dataset.i,10);saveIdx();playIndex()}));
+    listWrap.querySelectorAll("[data-x]").forEach(el=>el.addEventListener("click",()=>{const i=parseInt(el.dataset.x,10);playlist.splice(i,1);S.set("aud_playlist",playlist);if(idx>=playlist.length)idx=Math.max(0,playlist.length-1);renderList()}));
+  }
+
+  function setLoopUI(){btnLoop.textContent = `🔁 Loop: ${loop?"on":"off"}`}
+
+  function playIndex(){
+    if(!playlist.length){audio.removeAttribute("src");np.textContent="Sin selección";renderList();return}
+    const it=playlist[idx];
+    const src=transformDropbox(it.url);
+    np.textContent = it.title || "Audio";
+    audio.src=src;
+    audio.play().catch(()=>{});
+    renderList();
+  }
+
+  btnAdd.addEventListener("click",()=>{
+    const t=inTitle.value.trim()||"Audio";
+    const u=inUrl.value.trim();
+    if(!u) return;
+    playlist.push({title:t,url:u});
+    S.set("aud_playlist",playlist);
+    inTitle.value=""; inUrl.value="";
+    if(playlist.length===1){idx=0;saveIdx();}
+    renderList();
+  });
+  btnPrev.addEventListener("click",()=>{if(!playlist.length)return;idx = (idx-1+playlist.length)%playlist.length;saveIdx();playIndex()});
+  btnNext.addEventListener("click",()=>{if(!playlist.length)return;idx = (idx+1)%playlist.length;saveIdx();playIndex()});
+  btnLoop.addEventListener("click",()=>{loop=!loop;S.set("aud_loop",loop);setLoopUI()});
+
+  audio.addEventListener("ended",()=>{
+    if(loop){audio.currentTime=0;audio.play();return}
+    btnNext.click();
+  });
+  audio.addEventListener("timeupdate",()=>{if(!audio.paused) saveTime()});
+  setLoopUI();
+  renderList();
+  if(playlist.length){
+    playIndex();
+    const t=loadTime();
+    if(!isNaN(t) && t>1){audio.currentTime=t}
+  }
+}
 
 function initRecursos(){
-  let audios=S.get("audios",[]);
-  const aWrap=document.getElementById("audio_list"),aUrl=document.getElementById("audio_url"),aAdd=document.getElementById("audio_add");
-  function renderAudios(){aWrap.innerHTML=audios.map((u,i)=>`<div class="card"><audio controls src="${u}" style="width:100%"></audio><div class="small">${u}</div><div><button class="btn ghost" data-i="${i}">Eliminar</button></div></div>`).join("")||`<div class="card small">Sin audios aún.</div>`;aWrap.querySelectorAll("button[data-i]").forEach(b=>b.addEventListener("click",()=>{const i=parseInt(b.dataset.i);audios.splice(i,1);S.set("audios",audios);renderAudios()}))}
-  aAdd.addEventListener("click",()=>{const u=aUrl.value.trim();if(!u)return;audios.push(u);S.set("audios",audios);aUrl.value="";renderAudios()});renderAudios();
-
   let files=S.get("files",[]);
   const fWrap=document.getElementById("file_list"),fTitle=document.getElementById("file_title"),fUrl=document.getElementById("file_url"),fAdd=document.getElementById("file_add");
   function renderFiles(){fWrap.innerHTML=files.map((it,i)=>`<div class="checkrow"><a href="${it.url}" target="_blank">${it.title}</a><button class="btn ghost" data-i="${i}">✕</button></div>`).join("")||`<div class="card small">Sin materiales aún.</div>`;fWrap.querySelectorAll("button[data-i]").forEach(b=>b.addEventListener("click",()=>{const i=parseInt(b.dataset.i);files.splice(i,1);S.set("files",files);renderFiles()}))}
