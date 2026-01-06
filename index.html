@@ -57,9 +57,9 @@
       <details open>
         <summary>Semana 1 — VER: La Compasión que Mueve al Equipo</summary>
         <div class="card">
-<p><strong>VER: La Compasión que Mueve al Equipo</strong></p>
-<p><em>Texto base:</em> Mateo 9:36 / Juan 4:35</p>
-<p>Dinámica “Ojos que ven” — ver, sentir, actuar en amor. Lecturas: Mt 9:36; Jn 4:35; Lc 7:13; Lc 10:33; Lc 15:20.</p>
+          <p><strong>VER: La Compasión que Mueve al Equipo</strong></p>
+          <p><em>Texto base:</em> Mateo 9:36 / Juan 4:35</p>
+          <p>Dinámica “Ojos que ven” — ver, sentir, actuar en amor. Lecturas: Mt 9:36; Jn 4:35; Lc 7:13; Lc 10:33; Lc 15:20.</p>
         </div>
         <div class="row">
           <div class="col"><label>Testimonios</label><textarea id="testimonios_1"></textarea></div>
@@ -74,8 +74,8 @@
       <details>
         <summary>Semana 2 — INTERCEDER: Junto a Cristo</summary>
         <div class="card">
-<p><strong>INTERCEDER: Junto a Cristo</strong> (Ef 2:6 / Heb 4:16)</p>
-<p>Orar desde reposo y comunión, no desde carga. Dinámica “Cartas al Cielo”.</p>
+          <p><strong>INTERCEDER: Junto a Cristo</strong> (Ef 2:6 / Heb 4:16)</p>
+          <p>Orar desde reposo y comunión, no desde carga. Dinámica “Cartas al Cielo”.</p>
         </div>
         <div class="row">
           <div class="col"><label>Testimonios</label><textarea id="testimonios_2"></textarea></div>
@@ -90,8 +90,8 @@
       <details>
         <summary>Semana 3 — DAR: El Amor que se Entrega</summary>
         <div class="card">
-<p><strong>DAR: El Amor que se Entrega</strong> (Gá 2:20 / 2 Co 5:14 / Col 1:27 / Flp 2:13)</p>
-<p>Servicio, amistad, testimonio. Fluir del amor de Cristo.</p>
+          <p><strong>DAR: El Amor que se Entrega</strong> (Gá 2:20 / 2 Co 5:14 / Col 1:27 / Flp 2:13)</p>
+          <p>Servicio, amistad, testimonio. Fluir del amor de Cristo.</p>
         </div>
         <div class="row">
           <div class="col"><label>Testimonios</label><textarea id="testimonios_3"></textarea></div>
@@ -106,8 +106,8 @@
       <details>
         <summary>Semana 4 — ACEPTAR: Acompañar nuevos comienzos</summary>
         <div class="card">
-<p><strong>ACEPTAR: Acompañar nuevos comienzos</strong> (Mt 28:18–20 / Jn 1:12 / 2 Co 5:18–20 / Lc 15:7)</p>
-<p>Dos nombres en oración y acercamiento sencillo. Celebrar cada paso.</p>
+          <p><strong>ACEPTAR: Acompañar nuevos comienzos</strong> (Mt 28:18–20 / Jn 1:12 / 2 Co 5:18–20 / Lc 15:7)</p>
+          <p>Dos nombres en oración y acercamiento sencillo. Celebrar cada paso.</p>
         </div>
         <div class="row">
           <div class="col"><label>Testimonios</label><textarea id="testimonios_4"></textarea></div>
@@ -157,20 +157,11 @@
   <section id="player" class="view hide">
     <div class="card">
       <span class="badge">Audio</span>
-      <h2 class="h2">Reproductor</h2>
-      <div class="player-wrap">
-        <div class="nowplaying"><strong id="np_title">Sin selección</strong></div>
-        <audio id="audio" controls preload="none" style="width:100%"></audio>
-        <div class="row" style="margin-top:8px">
-          <div class="col" style="max-width:180px"><button id="btn_prev" class="btn block">⏮️ Anterior</button></div>
-          <div class="col" style="max-width:180px"><button id="btn_next" class="btn block">⏭️ Siguiente</button></div>
-          <div class="col" style="max-width:180px"><button id="btn_loop" class="btn block">🔁 Loop: off</button></div>
-        </div>
+      <h2 class="h2">Alabanza</h2>
+      <div class="iframe-wrap">
+        <iframe id="ext_player" title="Reproductor LBNC" src="https://tveditores-ux.github.io/2026-lbnc-alabanza/" allow="autoplay; encrypted-media" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
-    </div>
-    <div class="card">
-      <h3 class="h2">Lista</h3>
-      <div id="aud_list"></div>
+      <p class="caption small">Si no carga, <a href="https://tveditores-ux.github.io/2026-lbnc-alabanza/" target="_blank" rel="noopener">abrir en una pestaña nueva</a>.</p>
     </div>
   </section>
 
@@ -250,6 +241,19 @@
       </form>
     </div>
   </section>
+
+  <!-- NUEVA SECCIÓN: Libro de Formatos (integrado) -->
+  <section id="libro" class="view hide">
+    <div class="card">
+      <span class="badge">Libro</span>
+      <h2 class="h2">Libro de Formatos GdC</h2>
+      <div class="iframe-wrap">
+        <iframe id="libro_iframe" title="Libro GdC" src="./libro_gdc.html" loading="lazy" referrerpolicy="no-referrer"></iframe>
+      </div>
+      <p class="caption small">Se abre dentro de la app para usar los formatos (Datos, Programa, Planificador, Liderazgo, Reporte, FODA).</p>
+    </div>
+  </section>
+
 </div>
 
 <nav class="tabs">
@@ -260,6 +264,7 @@
   <a href="#player" class="tab" data-target="player">🎧<span>Audio</span></a>
   <a href="#resources" class="tab" data-target="resources">📎<span>Recursos</span></a>
   <a href="#reminders" class="tab" data-target="reminders">🔔<span>Record.</span></a>
+  <a href="#libro" class="tab" data-target="libro">📘<span>Libro</span></a>
 </nav>
 
 <div class="toast" role="status" aria-live="polite"></div>

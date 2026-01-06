@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Libro GdC — PWA</title>
+  <meta name="theme-color" content="#0d4b8f" />
+  <!-- Manifest y SW activos desde el inicio para permitir instalar ANTES del login -->
+<link rel="manifest" href="./manifest.webmanifest?v=3" />
+  <style>
+    :root { --brand:#0d4b8f; --brand-light:#2e7bd8; --ink:#1d2633; --muted:#6b7a90; --light:#f7f9fc; --border:#e5e9f2; --white:#ffffff; --accent:#1aa179; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--light); color: var(--ink); }
+    /* ===== Gate (acceso + instalar) ===== */
+    .gate { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+    .gate-card { width:100%; max-width:420px; background:#fff; border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:0 10px 30px rgba(13,75,143,.15); text-align:center; }
+    .gate-logo { width:64px; height:64px; border-radius:14px; background:linear-gradient(135deg, var(--brand-light), var(--brand)); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; margin:0 auto 10px; font-size:20px; }
+    .gate-title { font-size:22px; margin-bottom:6px; }
+    .gate-sub { color:var(--muted); margin-bottom:14px; }
+    .gate-install { width:100%; border:none; border-radius:14px; padding:16px 18px; font-weight:800; font-size:18px; background: var(--brand); color:#fff; cursor:pointer; margin:14px 0 18px; display:block; box-shadow:0 10px 24px rgba(13,75,143,.25); }
+    .label { display:block; font-size:14px; color:var(--muted); margin-bottom:6px; text-align:left; }
+    .input { width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; margin-bottom:10px; }
+    .btn { background: var(--brand); color:#fff; border:none; border-radius:10px; padding:10px 16px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .btn.alt { background: var(--accent); }
+    .btn.outline { background:transparent; color:var(--brand); border:1px solid var(--brand); }
+    .gate-form .btn { width:100%; margin-top:8px; }
+    /* ===== App ===== */
+    .app-container { display:none; height:100vh; flex-direction:column; background:#fff; }
+    .app-header { background: var(--brand); color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+    .app-title { display:flex; align-items:center; gap:10px; }
+    .app-logo { width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg, var(--brand-light), var(--brand)); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
+    .app-title-text h1 { font-size:18px; line-height:1.2; margin:0; }
+    .app-title-text .sub { font-size:11px; opacity:.85; }
+    .header-actions { display:flex; gap:8px; }
+    .icon-btn { background: rgba(255,255,255,.2); border: none; width:36px; height:36px; border-radius:50%; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .app-nav { display:flex; background:#fff; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
+    .app-nav::-webkit-scrollbar { display:none; }
+    .nav-item { padding:14px 16px; white-space:nowrap; border-bottom:3px solid transparent; font-weight:500; cursor:pointer; color:var(--muted); }
+    .nav-item.active { color:var(--brand); border-bottom-color:var(--brand); }
+    .app-content { flex:1; overflow:auto; padding:16px; }
+    .page { display:none; }
+    .page.active { display:block; }
+    .page-header { margin-bottom:20px; }
+    .page-title { font-size:22px; margin:0 0 8px; }
+    .badge-container { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .badge { display:inline-block; padding:4px 10px; border-radius:999px; background:#eef4ff; color:var(--brand); font-size:12px; font-weight:700; letter-spacing:.25px; }
+    .form-group { margin-bottom:16px; }
+    .form-row { display:flex; gap:12px; }
+    .form-row .form-group { flex:1; }
+    .textarea, .input, .select { width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; background:#fff; font:inherit; outline:none; }
+    .textarea { min-height:100px; resize:vertical; }
+    .box { border:1px solid #e6eef7; border-radius:12px; padding:16px; background:#fbfdff; margin-bottom:16px; }
+    .box-title { font-weight:600; margin-bottom:10px; }
+    .checkline { display:flex; align-items:center; gap:10px; margin:8px 0; }
+    .table-container { overflow-x:auto; margin-bottom:16px; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th,td { border:1px solid #e6eef7; padding:10px; text-align:center; }
+    thead th { background:#f3f7ff; color:#14365f; font-weight:600; }
+    tfoot td { background:#f8fbff; font-weight:700; }
+    .w-20 { width:20%; }
+    .app-footer { padding:12px 16px; background:#fff; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted); }
+    #logout-btn { position:fixed; bottom:20px; right:20px; padding:10px 14px; border:none; background:#e74c3c; color:white; border-radius:8px; font-weight:600; box-shadow:0 3px 6px rgba(0,0,0,.2); cursor:pointer; display:none; }
+    @media (min-width: 768px) { .app-container { max-width:520px; margin:0 auto; border:1px solid var(--border); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.08); } }
+    @media print { .app-header, .app-nav, .app-footer, #logout-btn { display:none !important; } .app-content { padding:0; } .page { display:block !important; page-break-after:always; } }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+  <!-- ===== Gate ===== -->
+  <div id="gate" class="gate">
+    <div class="gate-card">
+      <div class="gate-logo">GdC</div>
+      <h1 class="gate-title">Libro GdC</h1>
+      <p class="gate-sub">Instala la app y accede con tu correo</p>
+      <button class="gate-install" id="install-btn-gate"><i class="fas fa-download"></i> Instalar</button>
+      <div class="gate-form">
+        <label class="label" for="auth-email">Correo</label>
+        <input class="input" type="email" id="auth-email" placeholder="tucorreo@ejemplo.com" required autocomplete="email">
+        <label class="label" for="auth-pass">Clave de acceso<\/label>
+        <input class="input" type="password" id="auth-pass" placeholder="Clave de acceso" required autocomplete="current-password">
+        <button class="btn" id="auth-enter">Entrar</button>
+        <button class="icon-btn" id="print-btn" title="Imprimir"><i class="fas fa-print"></i></button>
+        <button class="icon-btn" id="export-btn" title="Exportar JSON"><i class="fas fa-file-export"></i></button>
+      </div>
+    </header>
+
+    <nav class="app-nav">
+      <div class="nav-item active" data-page="datos">Datos</div>
+      <div class="nav-item" data-page="programa">Programa</div>
+      <div class="nav-item" data-page="planificador">Planificador</div>
+      <div class="nav-item" data-page="liderazgo">Liderazgo</div>
+      <div class="nav-item" data-page="reporte">Reporte</div>
+      <div class="nav-item" data-page="foda">FODA</div>
+    </nav>
+
+    <main class="app-content">
+      <!-- Datos -->
+      <section class="page active" id="datos-page">
+        <div class="page-header">
+          <h2 class="page-title">Datos Personales</h2>
+          <div class="badge-container"><span class="badge">FORMATO 01</span><span class="badge">Identificación</span></div>
+        </div>
+        <div class="form-group"><label class="label">Pertenece a</label><input type="text" class="input" id="pertenece" placeholder="Ingrese nombre"></div>
+        <div class="form-group"><label class="label">Congregación</label><input type="text" class="input" id="congregacion" placeholder="Nombre de congregación"></div>
+        <div class="form-group"><label class="label">Dirección del GdC</label><input type="text" class="input" id="direccion" placeholder="Dirección completa"></div>
+        <div class="form-group"><label class="label">Correo Electrónico</label><input type="email" class="input" id="email" placeholder="email@ejemplo.com"></div>
+        <div class="form-group"><label class="label">Iglesia</label><input type="text" class="input" id="iglesia" placeholder="Nombre de iglesia"></div>
+        <div class="form-group"><label class="label">Líder Asesor</label><input type="text" class="input" id="lider_asesor" placeholder="Nombre del líder"></div>
+      </section>
+
+      <!-- Programa semanal -->
+      <section class="page" id="programa-page">
+        <div class="page-header">
+          <h2 class="page-title">Programa de Reunión Semanal</h2>
+          <div class="badge-container"><span class="badge">FORMATO 02</span><span class="badge">Operación Semanal</span></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="label">Lugar</label><input type="text" class="input" id="lugar" placeholder="Lugar de reunión"></div>
+          <div class="form-group"><label class="label">Día / Hora</label><input type="text" class="input" id="diahora" placeholder="Ej: Lunes 19:00"></div>
+        </div>
+        <div class="box"><div class="box-title">Resumen</div>
+          <div class="checkline"><input type="checkbox" id="miembros"><label for="miembros">Miembros</label></div>
+          <div class="checkline"><input type="checkbox" id="invitados"><label for="invitados">Invitados</label></div>
+          <div class="checkline"><input type="checkbox" id="asistencia"><label for="asistencia">Asistencia</label></div>
+          <div class="checkline"><input type="checkbox" id="ofrendas"><label for="ofrendas">Ofrendas</label></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="label">Tiempo de Refrigerio</label><input type="text" class="input" id="refrigerio" placeholder="Ej: 15 minutos"></div>
+          <div class="form-group"><label class="label">Dinámicas</label><textarea class="textarea" id="dinamicas" placeholder="Dinámicas planeadas"></textarea></div>
+        </div>
+        <div class="form-group"><label class="label">Testimonios (resumen)</label><textarea class="textarea" id="testimonios" placeholder="Resumen de testimonios"></textarea></div>
+        <div class="box"><div class="box-title">Adorar</div>
+          <div class="form-group"><label class="label">Canciones</label><textarea class="textarea" id="canciones" placeholder="Canciones seleccionadas"></textarea></div>
+          <div class="checkline"><input type="checkbox" id="adorar_listo"><label for="adorar_listo">Listo</label></div>
+        </div>
+        <div class="box"><div class="box-title">Aprender</div>
+          <div class="form-group"><label class="label">Elemento Clave</label><textarea class="textarea" id="aprender_clave" placeholder="Elemento clave del aprendizaje"></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label class="label">Grupo #1</label><input type="text" class="input" id="grupo1" placeholder="Responsable"></div>
+            <div class="form-group"><label class="label">Grupo #2</label><input type="text" class="input" id="grupo2" placeholder="Responsable"></div>
+          </div>
+          <div class="checkline"><input type="checkbox" id="aprender_listo"><label for="aprender_listo">Listo</label></div>
+        </div>
+        <div class="box"><div class="box-title">Compartir</div>
+          <div class="form-group"><label class="label">Notas</label><textarea class="textarea" id="compartir" placeholder="Notas para compartir"></textarea></div>
+          <div class="checkline"><input type="checkbox" id="compartir_listo"><label for="compartir_listo">Listo</label></div>
+        </div>
+        <div class="box"><div class="box-title">Conectar</div>
+          <div class="form-group"><label class="label">Seguimiento</label><textarea class="textarea" id="conectar" placeholder="Seguimiento y conexión"></textarea></div>
+          <div class="checkline"><input type="checkbox" id="conectar_listo"><label for="conectar_listo">Listo</label></div>
+        </div>
+        <div class="checkline"><input type="checkbox" id="visita_asesor"><label for="visita_asesor">Nos visitó el Líder Asesor</label></div>
+      </section>
+
+      <!-- Planificador -->
+      <section class="page" id="planificador-page">
+        <div class="page-header"><h2 class="page-title">Planificador Mensual</h2><div class="badge-container"><span class="badge">FORMATO 03</span><span class="badge">Planificación</span></div></div>
+        <div class="form-row">
+          <div class="form-group"><label class="label">Etapa</label>
+            <select class="select" id="etapa"><option value="">Seleccione etapa</option><option value="equipo">Equipo</option><option value="conquista">Conquista</option><option value="consolidacion">Consolidación</option><option value="multiplicacion">Multiplicación</option></select>
+          </div>
+          <div class="form-group"><label class="label">Mes</label><input type="text" class="input" id="mes" placeholder="Ej: Enero 2026"></div>
+        </div>
+        <template id="tpl-semana">
+          <div class="box">
+            <div class="box-title">Semana X</div>
+            <div class="form-group"><label class="label">Refrigerio</label><input type="text" class="input" placeholder="Responsable"></div>
+            <div class="form-group"><label class="label">Dinámicas</label><textarea class="textarea" placeholder="Dinámicas planeadas"></textarea></div>
+            <div class="form-group"><label class="label">Elemento Clave</label><textarea class="textarea" placeholder="Elemento clave"></textarea></div>
+            <div class="form-group"><label class="label">Apoyo</label><textarea class="textarea" placeholder="Apoyo necesario"></textarea></div>
+          </div>
+        </template>
+        <div id="semanas"></div>
+      </section>
+
+      <!-- Liderazgo -->
+      <section class="page" id="liderazgo-page">
+        <div class="page-header"><h2 class="page-title">Desarrollo de Liderazgo</h2><div class="badge-container"><span class="badge">FORMATO 04</span><span class="badge">Proceso de Formación</span></div></div>
+        <div class="box">
+          <div class="label" style="margin-bottom: 10px;">Marque el avance por persona en los hitos: NV, B, tPE, VL, 2D, DRT, dLC, LCa, CC, Otros.</div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th class="w-20">Nombre</th><th>NV</th><th>B</th><th>tPE</th><th>VL</th><th>2D</th><th>DRT</th><th>dLC</th><th>LCa</th><th>CC</th><th>Otros</th></tr></thead>
+              <tbody id="liderazgo-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reporte -->
+      <section class="page" id="reporte-page">
+        <div class="page-header"><h2 class="page-title">Reporte Trimestral</h2><div class="badge-container"><span class="badge">FORMATO 05</span><span class="badge">Indicadores</span></div></div>
+        <div class="form-row">
+          <div class="form-group">
+            <div class="box"><div class="box-title">Ofrendas</div>
+              <div class="table-container"><table><thead><tr><th class="w-20">Semana</th><th>Monto</th></tr></thead><tbody id="ofrendas-body"></tbody><tfoot><tr><td>Total</td><td id="ofrendas-total">0</td></tr></tfoot></table></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="box"><div class="box-title">Visitantes</div>
+              <div class="table-container"><table><thead><tr><th class="w-20">Semana</th><th>Nº</th></tr></thead><tbody id="visitantes-body"></tbody><tfoot><tr><td>Promedio</td><td id="visitantes-prom">0</td></tr></tfoot></table></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="box"><div class="box-title">Asistencia</div>
+              <div class="table-container"><table><thead><tr><th class="w-20">Semana</th><th>Nº</th></tr></thead><tbody id="asistencia-body"></tbody><tfoot><tr><td>Promedio</td><td id="asistencia-prom">0</td></tr></tfoot></table></div>
+            </div>
+          </div>
+        </div>
+        <div class="label">Incluye 13 semanas para trimestres largos. Totales y promedios automáticos.</div>
+        <div class="box">
+          <div class="box-title">Enviar reporte</div>
+          <div class="form-row" style="gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="btn-share-native"><i class="fas fa-share-alt"></i> Compartir</button>
+            <button class="btn alt" id="btn-share-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+            <button class="btn outline" id="btn-share-email"><i class="fas fa-envelope"></i> Correo</button>
+          </div>
+          <small class="label">“Compartir” usa el menú nativo cuando esté disponible.</small>
+        </div>
+      </section>
+
+      <!-- FODA -->
+      <section class="page" id="foda-page">
+        <div class="page-header"><h2 class="page-title">F.O.D.A.</h2><div class="badge-container"><span class="badge">FORMATO 06</span><span class="badge">Análisis Situacional</span></div></div>
+        <div class="form-row">
+          <div class="form-group"><div class="box"><div class="box-title">Fortalezas</div><textarea class="textarea" placeholder="Lista de fortalezas..."></textarea></div></div>
+          <div class="form-group"><div class="box"><div class="box-title">Oportunidades</div><textarea class="textarea" placeholder="Lista de oportunidades..."></textarea></div></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><div class="box"><div class="box-title">Debilidades</div><textarea class="textarea" placeholder="Lista de debilidades..."></textarea></div></div>
+          <div class="form-group"><div class="box"><div class="box-title">Amenazas</div><textarea class="textarea" placeholder="Lista de amenazas..."></textarea></div></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <div class="footer-info">Tinta Verde Editores · v2.2 PWA</div>
+      <div class="footer-actions">
+        <button class="btn outline" id="save-btn"><i class="fas fa-save"></i> Guardar</button>
+        <button class="btn alt" id="sync-btn"><i class="fas fa-sync"></i> Sincronizar</button>
+      </div>
+    </footer>
+  </div>
+
+  <button id="logout-btn">Cerrar sesión</button>
+
+  <script>
+    // ======== Lista blanca (correo → clave fija por usuario) ========
+const AUTHORIZED = {
+  'ejam3@me.com': 'Acceso2025!EJ',
+  'maryc68@gmail.com': 'Acceso2025!MC',
+  'escalona.pablo@gmail.com': 'Acceso2025!EP',
+  'pastor.sequera@gmail.com': 'Acceso2025!PS',
+  'jesuthbelisario@gmail.com': 'Acceso2025!JB',
+  'yamileta@gmail.com': 'Acceso2025!YA',
+  'rosatorealba@gmail.com': 'Acceso2025!RA',
+  'rosatorrealba316@gmail.com': 'Acceso2025!RT'
+};
+
+    // ======== Referencias ========
+    const gate = document.getElementById('gate');
+    const app = document.querySelector('.app-container');
+    const authEmail = document.getElementById('auth-email');
+    const authPass  = document.getElementById('auth-pass');
+    const authEnter = document.getElementById('auth-enter');
+    const authMsg   = document.getElementById('auth-msg');
+    const headerInstallBtn = document.getElementById('install-btn');
+const gateInstallBtn   = document.getElementById('install-btn-gate');
+if (headerInstallBtn) headerInstallBtn.style.display = 'none';
+if (gateInstallBtn)   gateInstallBtn.style.display   = 'inline-flex';
+
+    function isLogged() { return !!localStorage.getItem('gdc_session'); }
+    function showApp() { if (gate) gate.style.display = 'none'; if (app) app.style.display = 'flex'; }
+    function showGate() { if (gate) gate.style.display = 'flex'; if (app) app.style.display = 'none'; }
+
+    // ======== A2HS ========
+let deferredPrompt;
+function wireInstallPrompt(){
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault(); deferredPrompt = e;
+    if (headerInstallBtn) headerInstallBtn.style.display = 'inline-flex';
+    if (gateInstallBtn)   gateInstallBtn.style.display   = 'inline-flex';
+  });
+  window.addEventListener('appinstalled', ()=>{
+    localStorage.setItem('gdc_installed','1');
+    enableLoginUI();
+  });
+}
+async function doInstall(){
+  if (!deferredPrompt) { alert('En iPhone/iPad usa “Compartir → Añadir a pantalla de inicio”.'); return; }
+  deferredPrompt.prompt();
+  const choice = await deferredPrompt.userChoice;
+  if (choice && choice.outcome==='accepted'){
+    localStorage.setItem('gdc_installed','1');
+    if (headerInstallBtn) { headerInstallBtn.innerHTML='Instalada ✔'; headerInstallBtn.disabled=true; }
+    if (gateInstallBtn)   { gateInstallBtn.innerHTML  ='Instalada ✔'; gateInstallBtn.disabled  =true; }
+    enableLoginUI();
+  }
+  deferredPrompt = null;
+}
+if (headerInstallBtn) headerInstallBtn.addEventListener('click', doInstall);
+if (gateInstallBtn)   gateInstallBtn.addEventListener('click', doInstall);
+
+// ======== Login ========
+function isInstalled(){
+  return localStorage.getItem('gdc_installed')==='1' || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator.standalone === true);
+}
+function disableLoginUI(){
+  if (authEmail) authEmail.disabled = true;
+  if (authPass)  authPass.disabled  = true;
+  if (authEnter) authEnter.disabled = true;
+  if (authMsg){ authMsg.textContent = 'Primero instala la app (botón “Instalar”), luego ingresa tu correo y clave.'; authMsg.style.color = '#14365f'; }
+}
+function enableLoginUI(){
+  if (authEmail) authEmail.disabled = false;
+  if (authPass)  authPass.disabled  = false;
+  if (authEnter) authEnter.disabled = false;
+  if (authMsg){ authMsg.textContent = 'Ahora ingresa tu correo y clave.'; authMsg.style.color = '#1aa179'; }
+}
+function login(email){
+  localStorage.setItem('gdc_session', JSON.stringify({ email, ts: Date.now() }));
+  showApp();
+  createLogoutButton();
+}
+function handleLogin(){
+  if (!isInstalled()) { disableLoginUI(); return; }
+  const email = (authEmail?.value||'').trim().toLowerCase();
+  const pass  = (authPass?.value||'').trim();
+  if (!email || !pass){ authMsg.textContent='Completa correo y clave.'; authMsg.style.color='#a94442'; return; }
+  const expected = AUTHORIZED[email];
+  if (!expected){ authMsg.textContent='Correo no autorizado.'; authMsg.style.color='#a94442'; return; }
+  if (pass !== expected){ authMsg.textContent='Clave incorrecta.'; authMsg.style.color='#a94442'; return; }
+  authMsg.textContent='';
+  login(email);
+}
+if (authEnter) authEnter.addEventListener('click', handleLogin);
+if (authPass)  authPass.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleLogin(); });
+
+// ======== Navegación ========
+    document.addEventListener('click', (ev) => {
+      const tab = ev.target.closest('.nav-item');
+      if (!tab) return;
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const id = tab.getAttribute('data-page') + '-page';
+      document.getElementById(id).classList.add('active');
+    });
+
+    // ======== Planificador semanas ========
+    document.addEventListener('DOMContentLoaded', () => {
+      const cont = document.getElementById('semanas');
+      const tpl = document.getElementById('tpl-semana');
+      if (cont && tpl) {
+        cont.innerHTML = '';
+        for (let i=1;i<=4;i++) {
+          const node = tpl.content.cloneNode(true);
+          node.querySelector('.box-title').textContent = `Semana ${i}`;
+          cont.appendChild(node);
+        }
+      }
+      generateLeadershipTable();
+      generateReportTables();
+      loadData();
+      document.addEventListener('input', (e) => { if (e.target.hasAttribute('contenteditable')) calculateTotals(); });
+    });
+
+    // ======== Liderazgo/reporte helpers ========
+    function generateLeadershipTable() {
+      const tbody = document.getElementById('liderazgo-body');
+      if (!tbody) return;
+      let rows = '';
+      for (let i = 0; i < 10; i++) {
+        rows += `<tr>
+          <td contenteditable="true"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td><input type="checkbox"></td>
+          <td contenteditable="true"></td>
+        </tr>`;
+      }
+      tbody.innerHTML = rows;
+    }
+    function generateReportTables() {
+      const tables = ['ofrendas', 'visitantes', 'asistencia'];
+      tables.forEach(table => {
+        const tbody = document.getElementById(`${table}-body`);
+        if (!tbody) return;
+        let rows = '';
+        for (let i = 1; i <= 13; i++) {
+          rows += `<tr><td>${i.toString().padStart(2,'0')}</td><td contenteditable="true" data-row="${i}"></td></tr>`;
+        }
+        tbody.innerHTML = rows;
+      });
+    }
+    function calculateTotals() {
+      const num = sel => Array.from(document.querySelectorAll(sel)).map(td => parseFloat(td.innerText)||0);
+      const sum = arr => arr.reduce((a,b)=>a+b,0);
+      const avg = arr => { const v = arr.filter(x=>x>0); return v.length? (sum(v)/v.length):0; };
+      const ofr = num('#ofrendas-body td[contenteditable]');
+      const vis = num('#visitantes-body td[contenteditable]');
+      const asi = num('#asistencia-body td[contenteditable]');
+      const totalOfr = sum(ofr);
+      const promVis = avg(vis);
+      const promAsi = avg(asi);
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+      set('ofrendas-total', totalOfr.toLocaleString());
+      set('visitantes-prom', promVis.toFixed(1));
+      set('asistencia-prom', promAsi.toFixed(1));
+    }
+
+    // ======== Persistencia local ========
+    function getDataSnapshot() {
+      return {
+        datos: {
+          pertenece: document.getElementById('pertenece')?.value || '',
+          congregacion: document.getElementById('congregacion')?.value || '',
+          direccion: document.getElementById('direccion')?.value || '',
+          email: document.getElementById('email')?.value || '',
+          iglesia: document.getElementById('iglesia')?.value || '',
+          lider_asesor: document.getElementById('lider_asesor')?.value || ''
+        }
+      };
+    }
+    function saveData() { localStorage.setItem('libroGdCData', JSON.stringify(getDataSnapshot())); alert('Datos guardados localmente'); }
+    function loadData() {
+      const saved = localStorage.getItem('libroGdCData');
+      if (!saved) return; const data = JSON.parse(saved);
+      if (data.datos) {
+        const k = data.datos;
+        const setv = (id,val)=>{ const el = document.getElementById(id); if (el) el.value = val||''; };
+        setv('pertenece', k.pertenece); setv('congregacion', k.congregacion); setv('direccion', k.direccion);
+        setv('email', k.email); setv('iglesia', k.iglesia); setv('lider_asesor', k.lider_asesor);
+      }
+    }
+    function exportData() {
+      const blob = new Blob([JSON.stringify(getDataSnapshot(), null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a');
+      a.href = url; a.download = 'libro_gdc_datos.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    }
+
+    // ======== Reporte: compartir ========
+    function buildReportText() {
+      const d = getDataSnapshot().datos;
+      const num = sel => Array.from(document.querySelectorAll(sel)).map(td => parseFloat(td.innerText)||0);
+      const sum = arr => arr.reduce((a,b)=>a+b,0);
+      const avg = arr => { const v = arr.filter(x=>x>0); return v.length? (sum(v)/v.length):0; };
+      const ofr = num('#ofrendas-body td[contenteditable]');
+      const vis = num('#visitantes-body td[contenteditable]');
+      const asi = num('#asistencia-body td[contenteditable]');
+      const lineas = [
+        'Libro GdC — Reporte',
+        `Grupo: ${d.pertenece||'-'} | Congregación: ${d.congregacion||'-'}`,
+        `Dirección: ${d.direccion||'-'} | Asesor: ${d.lider_asesor||'-'}`,
+        '',
+        `Ofrendas — Total: ${sum(ofr).toLocaleString()}`,
+        `Visitantes — Promedio: ${avg(vis).toFixed(1)}`,
+        `Asistencia — Promedio: ${avg(asi).toFixed(1)}`
+      ];
+      return lineas.join('\n');
+    }
+    async function shareNative() {
+      const text = buildReportText(); const title = 'Reporte GdC';
+      if (navigator.share) { try { await navigator.share({ title, text }); } catch(e){} }
+      else { alert('Compartir nativo no disponible. Usa WhatsApp o Correo.'); }
+    }
+    function shareWhatsApp() { const text = buildReportText(); const url = `https://wa.me/?text=${encodeURIComponent(text)}`; window.open(url,'_blank'); }
+    function shareEmail() { const text = buildReportText(); const subject = 'Reporte GdC'; window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`; }
+
+    // ======== Eventos generales ========
+    document.getElementById('print-btn')?.addEventListener('click', () => window.print());
+    document.getElementById('export-btn')?.addEventListener('click', exportData);
+    document.getElementById('save-btn')?.addEventListener('click', saveData);
+    document.getElementById('sync-btn')?.addEventListener('click', () => alert('Función de sincronización en desarrollo'));
+    document.getElementById('btn-share-native')?.addEventListener('click', shareNative);
+    document.getElementById('btn-share-whatsapp')?.addEventListener('click', shareWhatsApp);
+    document.getElementById('btn-share-email')?.addEventListener('click', shareEmail);
+
+    // ======== Logout ========
+    function createLogoutButton() {
+      const btn = document.getElementById('logout-btn');
+      if (!btn) return; btn.style.display = 'inline-block';
+      btn.onclick = () => { localStorage.removeItem('gdc_session'); alert('Sesión cerrada'); location.reload(); };
+    }
+
+    // ======== Boot ========
+// Registrar SW y preparar instalador desde el inicio
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
+wireInstallPrompt();
+// Si ya está instalada, habilitar login
+if (localStorage.getItem('gdc_installed')==='1' || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator.standalone === true)) {
+  enableLoginUI();
+} else {
+  disableLoginUI();
+}
+// Mostrar gate/app según sesión
+if (localStorage.getItem('gdc_session')) { showApp(); createLogoutButton(); } else { showGate(); }
